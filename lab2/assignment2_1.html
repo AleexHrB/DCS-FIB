@@ -1,0 +1,198 @@
+ <html> 
+      <head> 
+      <title>DCS - 2.1</title> 
+      </head>
+
+      <body>
+
+      <h1>DCS - 2.1 Elliptic helix in 3D</h1>
+      <label for="HelixPitch">Helix Pitch</label>
+      <input type="number" id="HelixPitch" value="1"/>
+      <label for="HelixMinor">Helix Minor</label>
+      <input type="number" id="HelixMinor" value="1"/>
+      <label for="HelixMajor">Helix Major</label>
+      <input type="number" id="HelixMajor" value="1"/>
+      <br>
+      <br>
+      <label for="SpiralX">SpiralX</label>
+      <input type="number" id="SpiralX" value="1"/>
+      <label for="SpiralY">SpiralY</label>
+      <input type="number" id="SpiralY" value="1"/>
+      <label for="SpiralZ">SpiralZ</label>
+      <input type="number" id="SpiralZ" value="1"/>
+      <br>
+      <br>
+
+      <script src="math.min.js"></script>
+      <script src="three.min.js"></script>
+      <script src="OrbitControlsDCS.js"></script>
+
+     <script type="text/javascript">
+        /**
+        * Based on code by Ikaros Kappler from http://int2byte.de/public/blog.20160129_Three.js_Basic_Scene_Setup/
+        **/
+
+        // Create new scene
+        this.scene = new THREE.Scene();
+
+        // Create a camera to look through
+        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+
+        // Initialize a new THREE renderer (you are also allowed
+        // to pass an existing canvas for rendering).
+        this.renderer = new THREE.WebGLRenderer( { antialias : true, alpha:true } );
+        this.renderer.setSize(800, 600);
+
+        // ... and append it to the DOM
+        document.body.appendChild(renderer.domElement);
+
+        var lineGeom = new THREE.Geometry();
+        buildGeometry(lineGeom);
+
+        var lineMat = new THREE.LineBasicMaterial( {
+            color:  0xA000A0  // purple; the default is white
+        } );
+
+        var line = new THREE.Line( lineGeom, lineMat, THREE.LineStrip );
+        this.scene.add(line);
+
+        var lineGeom2 = new THREE.Geometry();
+        buildGeometry2(lineGeom2);
+
+        var lineMat2 = new THREE.LineBasicMaterial( {
+            color:  0xFFFFFF  // purple; the default is white
+        } );
+
+        var line2 = new THREE.Line( lineGeom2, lineMat2, THREE.LineStrip );
+        this.scene.add(line2);
+
+        // Add some light
+        this.pointLight = new THREE.PointLight(0xFFFFFF);
+        //this.pointLight = new THREE.AmbientLight(0xFFFFFF);
+
+        // set its position
+        this.pointLight.position.x = 10;
+        this.pointLight.position.y = 50;
+        this.pointLight.position.z = 130;
+
+        // add to the scene
+        this.scene.add( this.pointLight );
+
+
+        // Add grid helper
+        var gridHelper = new THREE.GridHelper( 90, 9 );
+        gridHelper.colorGrid = 0xE8E8E8;
+        this.scene.add( gridHelper );
+
+
+        // Add an axis helper
+        var ah = new THREE.AxisHelper(50);
+        ah.position.y -= 0.1;  // The axis helper should not interfere with the grid helper
+        this.scene.add( ah );
+
+
+        // Set the camera position
+        this.camera.position.set( 50, 50, 50);
+        this.camera.lookAt(line.position);
+
+        // Finally we want to be able to rotate the whole scene with the mouse:
+        // Add an orbit control helper.
+        var _self = this;
+        this.orbitControls = new THREE.OrbitControls( this.camera, this.renderer.domElement );
+        // Always move the point light with the camera. Looks much better ;)
+        this.orbitControls.addEventListener( 'change',
+        function() { _self.pointLight.position.copy(_self.camera.position); }
+        );
+        this.orbitControls.enableDamping = true;
+        this.orbitControls.dampingFactor = 1.0;
+        this.orbitControls.enableZoom    = true;
+        this.orbitControls.target.copy(line.position);
+
+
+        // This is the basic render function. It will be called perpetual, again and again,
+        // depending on your machines possible frame rate.
+        this._render = function () {
+            // Pass the render function itself
+            this.scene.remove(line);
+            this.scene.remove(line2);
+            lineGeom = new THREE.Geometry();
+            buildGeometry(lineGeom);
+
+            lineMat = new THREE.LineBasicMaterial( {
+                color:  0xA000A0  // purple; the default is white
+            } );
+
+            line = new THREE.Line( lineGeom, lineMat, THREE.LineStrip );
+            this.scene.add(line);
+
+            lineGeom2 = new THREE.Geometry();
+            buildGeometry2(lineGeom2);
+
+            lineMat2 = new THREE.LineBasicMaterial( {
+                color:  0xFFFFFF  // purple; the default is white
+            } );
+
+            line2 = new THREE.Line( lineGeom2, lineMat2, THREE.LineStrip );
+            this.scene.add(line2);
+
+            requestAnimationFrame(this._render);
+            this.renderer.render(this.scene, this.camera);
+        };
+
+        // Call the rendering function. This will cause an infinite recursion
+        this._render();
+
+
+        /**
+         *  This is the function where the actual points on the curve are computed
+         *
+         *  TODO: Change this function to draw a different curve
+         */
+
+        function buildGeometry(lineGeometry) {
+            let pitch = document.getElementById("HelixPitch").value;
+            pitch = Number(pitch);
+
+            let major = document.getElementById("HelixMajor").value;
+            major = Number(major);
+
+            let minor = document.getElementById("HelixMinor").value;
+            minor = Number(minor);
+
+            const points = 10000;
+            const density = 10;
+
+            for (let i = 0; i < points; ++i){
+                let j = i / density;
+                let x = major * Math.cos(j);
+                let y = minor * Math.sin(j);
+                let z = pitch * j;
+				lineGeom.vertices.push(new THREE.Vector3(y, z, x));
+            }
+        }
+
+        function buildGeometry2(lineGeometry) {
+            const points = 1000;
+            const density = 10;
+
+            let sp_x = document.getElementById("SpiralX").value;
+            sp_x = Number(sp_x);
+            let sp_y = document.getElementById("SpiralY").value;
+            sp_y = Number(sp_y);
+            let sp_z = document.getElementById("SpiralZ").value;
+            sp_z = Number(sp_z);
+
+            for (let i = 0; i < points; ++i){
+                let j = i / density;
+                let x = sp_x * j * Math.cos(j);
+                let y = sp_y * j * Math.sin(j);
+                let z = sp_z * j;
+				lineGeom.vertices.push(new THREE.Vector3(y, z, x));
+            }
+        }
+	  
+	  </script>
+      <br>
+		Note: X axis is red, Y axis is green, Z axis is blue. Each grid square on the plane Y=0 has size 10x10.      </body>
+
+      </html>

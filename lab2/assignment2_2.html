@@ -1,0 +1,242 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>DCS - 2.2</title>
+
+    <!--- Math.js library, for matrix manipulation, and many other things--->
+    <script src=https://cdnjs.cloudflare.com/ajax/libs/mathjs/3.3.0/math.min.js></script>
+</head>
+
+<body>
+
+<h1>DCS - 2.2 Properties of conics</h1>
+
+<canvas id="canvas1" height="600" width="600" class="bezier"  style="border:1px solid #d3d3d3;"></canvas>
+<br>
+<input type="range" id="Slider" min="-240" max="240" value="-240" step="1" />
+<label for="Slider">Move line</label>
+
+
+<script type="text/javascript">
+
+    /*
+    * Part of this code is based on:
+        * http://blogs.sitepoint.com/html5-canvas-draw-quadratic-curves/
+        * http://blogs.sitepoint.com/html5-canvas-draw-bezier-curves/
+    */
+
+    var canvas1, context1, points, myTransformation, style, drag = null, draggedPoint;
+
+    const range = 480;
+    points = [...Array(range).keys()];
+    points = points.map((x) => x - range/2);
+    points = points.map((a) => ({
+        x: a,
+        y: a*a/200
+    }));
+
+    let focus_point = [{
+        x: -240,
+        y: 240*240/200
+    }, {
+        x: -240,
+        y: 240*240/200
+    }, {
+        x: -240,
+        y: 240*240/200
+    }];
+
+    //y = mx + n = f'(x) x + n
+    //y - y0 = f'(x0) * (x - x0) -> y = f'(x0) * (x - x0) + y0 -> y = f'(x0) * x - f'(x0) * x0 + y0
+    document.getElementById("Slider").addEventListener("input", (e) => {
+        const value = Number(e.target.value);
+        focus_point[0].x = value;
+        //240*240/200
+        focus_point[0].y = 288;
+
+        focus_point[1].x = value;
+        focus_point[1].y = value*value/200;
+        focus_point[2].x = focus_point[2].y = 0;
+
+        const n = focus_point[1].y - value / 100 * value;
+
+        const p1 = {
+            x: 0,
+            y: n
+        };
+
+        const p2 = {
+            x: 5,
+            y: value/100*5 + n
+        };
+
+        const v = {
+            x: p2.x - p1.x,
+            y: p2.y - p1.y
+        };
+
+        const v2 = {
+            x: 0,
+            y: -1
+        };
+
+        //a * b = |a| * |b| * cos(alpha)
+
+        let angle = -v.y / (Math.sqrt(v.x * v.x + v.y * v.y));
+        angle = 2*Math.acos(angle);
+        let c = Math.cos(angle);
+        let s = Math.sin(angle);
+        let rot_matrix = math.matrix([[c, -s], [s, c]]);
+
+        let result = math.multiply(rot_matrix, [v2.x, v2.y]);
+        let v_rot = {x: result.get([0]),y: result.get([1])};
+
+        focus_point[2].x = focus_point[1].x + 400 * v_rot.x;
+        focus_point[2].y = focus_point[1].y + 400 * v_rot.y;
+
+
+        drawCanvas();
+    });
+
+    function init() {
+
+        myTransformation = function(p){return p}; //Identity transform
+
+        // default styles
+        style = {
+            curve:	{ width: 6, color: "#333" },
+            line:	{ width: 1, color: "#C00" },
+            point: { radius: 10, width: 2, color: "#900", fill: "rgba(200,200,200,0.5)", arc1: 0, arc2: 2 * Math.PI }
+        }
+
+        // line style defaults
+        context1.lineCap = "round";
+        context1.lineJoin = "round";
+
+        // Translate origin to center of canvas
+        context1.translate(canvas1.width/2,canvas1.height/2);
+		
+		// Flip y-axis, so it looks like in standard math axes
+		context1.scale(1,-1) // Reversed y-axis
+
+        drawCanvas();
+    }
+
+
+    /**
+     Basic drawing methods
+     **/
+
+
+    // draw canvas
+    function drawCanvas() {
+        // Clear everything
+        context1.translate(-canvas1.width/2,-canvas1.height/2);
+        context1.clearRect(0, 0, canvas1.width, canvas1.height);  // Clear canvas
+        context1.translate(canvas1.width/2,canvas1.height/2);
+
+
+        // Background grids
+        drawGrid(context1,canvas1.width, canvas1.height); // Draw background grid
+
+        // Original points and vertices
+        drawVertices(context1, style, focus_point); // Draw vertices as circles
+        drawVertices(context1, style, [{x:0, y:50}]); // Draw vertices as circles
+        drawCurve(context1, style, points); // Draw curve
+        drawCurve(context1, style, focus_point); // Draw vertices as circles
+    }
+
+
+    // Draw a background grid
+    function drawGrid(myContext,bw,bh){
+        var delta = 50; // grid cell size
+
+        var half_width = bw/2;
+        var half_height = bh/2;
+        for (var x = -half_width; x <= half_width; x += delta) {
+            myContext.moveTo(x, -half_height);
+            myContext.lineTo(x, half_height);
+        }
+
+        for (var y = -half_height; y <= half_height; y += delta) {
+            myContext.moveTo(-half_width, y);
+            myContext.lineTo(half_width , y);
+        }
+
+        myContext.lineWidth = 1;
+        myContext.strokeStyle = "lightgray";
+        myContext.stroke();
+
+   
+
+    }
+
+    // Draws a polygonal curve connecting the points, after applying the given transformation
+    function drawCurve(ctx, style, points, transformation) {
+        // The transformation is optional. If none provided, use identity transform
+        if (transformation===undefined) {
+            transformation = function(p){return p}; //Identity transform
+        }
+
+        // Draw curve
+        ctx.lineWidth = style.curve.width;
+        ctx.strokeStyle = style.curve.color;
+        ctx.beginPath();
+        var firstPoint = transformation(points[0]);
+        var currentPoint;
+        ctx.moveTo(firstPoint.x, firstPoint.y);
+        for (var i = 0; i < points.length; i++) {
+            currentPoint =  transformation(points[i]);
+            ctx.lineTo(currentPoint.x, currentPoint.y);
+            ctx.moveTo(currentPoint.x, currentPoint.y);
+        }
+        ctx.stroke();
+    }
+
+    // Draw circles around vertices to facilitate drag and drop
+    function drawVertices (ctx, style, points) {
+        for (var i = 0; i < points.length; i++) {
+            var p = points[i];
+            ctx.lineWidth = style.point.width;
+            ctx.strokeStyle = style.point.color;
+            ctx.fillStyle = style.point.fill;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, style.point.radius, style.point.arc1, style.point.arc2, true);
+            ctx.fill();
+            ctx.stroke();
+        }
+    }
+
+
+    /**
+     * Start ("main method")
+     */
+
+    // Assign canvas and context variables
+    canvas1 = document.getElementById("canvas1");
+    context1 = canvas1.getContext("2d");
+
+    init();
+
+    /**
+     * Auxiliary functions
+     */
+
+
+    function doReset () {
+        myTransformation = function(p){return p}; //Identity transform
+        drawCanvas();
+    }
+
+    // This is just an example
+    function computeConic() {
+        // to something
+        alert('Code to be written!');
+        drawCanvas();
+    }
+
+</script>
+</body>
+</html>

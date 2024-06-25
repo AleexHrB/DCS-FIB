@@ -1,0 +1,329 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>DCS - 3.3</title>
+
+    <!--- Math.js library, for matrix manipulation, and many other things--->
+    <script src=https://cdnjs.cloudflare.com/ajax/libs/mathjs/3.3.0/math.min.js></script>
+</head>
+
+<body>
+
+<h1>DCS - 3.3 Cubic Hermite interpolation</h1>
+
+<canvas id="canvas1" height="600" width="800" class="bezier"  style="border:1px solid #d3d3d3;"></canvas>
+<br>
+<b id="Point"> </b>
+<br>
+<br>
+<button type="button" onclick="plotOriginal()"> Original configuration </button>
+<button type="button" onclick="plotSolution()"> Solution for problem 4</button>
+<br>
+<b> For finding the solution for exercice 4 you should must evaluate the Hermite Interpolation at t = 0.5 considering that your vector only can scale and the find the value of this "scale"</b>
+<script type="text/javascript">
+
+// (1/4 - 3/4 + 1)* 200 + 300 * (-1/4 + 3/4) + (1/8 - 1/2 + 1/2) 100x = 300
+// 100 + 150  + 1/8 * 100x = 300
+// 250  + 12.5x = 300
+// 12.5x = 50
+// x = 50 / 12.5 = 4 -> First vector should be (400,400)
+
+
+
+
+// (1/4 - 3/4 + 1)* 200 + 400 * (-1/4 + 3/4) + (1/8 - 1/2 + 1/2) 100x + (1/8 - 1/4) 100y = 300
+// 100 + 200 + 12.5x - 1/8 100y = 300
+// 100 + 200 + 50 - 12.5y = 300
+// 100 + 200 + 50 - 300 = + 12.5y
+// 50 = + 12.5y
+    // y = 4 -> Second vector should be (400,0)
+
+    function plotSolution() {
+        points[0] = {
+            x:200,
+            y:200
+        };
+
+        points[1] = {
+            x:400 + points[0].x,
+            y:400 + points[0].y
+        };
+
+        points[3] = {
+            x:400,
+            y:300
+        };
+
+        points[2] = {
+            x:400 + points[3].x,
+            y:300
+        };
+
+        drawCanvas();
+    }
+
+    function plotOriginal() {
+        points[0] = {
+            x:200,
+            y:200
+        };
+
+        points[1] = {
+            x:300,
+            y:300
+        };
+
+        points[3] = {
+            x:400,
+            y:300
+        };
+
+        points[2] = {
+            x:500,
+            y:300
+        };
+
+        drawCanvas();
+    }
+
+    /*
+    * Part of this code is based on:
+        * http://blogs.sitepoint.com/html5-canvas-draw-quadratic-curves/
+        * http://blogs.sitepoint.com/html5-canvas-draw-bezier-curves/
+    */
+
+    var canvas1, context1, points, myTransformation, style, drag = null, draggedPoint;
+
+    points = [{ x:300, y:300 },{ x:200, y:200 },{ x:400, y:300 },{ x:500, y:300 }];
+
+    function init() {
+
+        myTransformation = function(p){return p}; //Identity transform
+
+        // default styles
+        style = {
+            curve:	{ width: 6, color: "#333" },
+            line:	{ width: 1, color: "#C00" },
+            point: { radius: 10, width: 2, color: "#900", fill: "rgba(200,200,200,0.5)", arc1: 0, arc2: 2 * Math.PI }
+        }
+
+        // line style defaults
+        context1.lineCap = "round";
+        context1.lineJoin = "round";
+
+        // event handlers (only canvas1)
+        canvas1.onmousedown = dragStart;
+        canvas1.onmousemove = dragging;
+        canvas1.onmouseup = canvas1.onmouseout = dragEnd;
+
+        drawCanvas();
+    }
+
+
+    /**
+     Basic drawing methods
+     **/
+
+    function hermite(t) {
+
+        let p = {
+            x:0,
+            y:0
+        };
+
+        let firstBlending = 2*t*t*t - 3*t*t + 1;
+        let secondBlending = -2*t*t*t + 3*t*t;
+        let thirdBlending = t*t*t - 2*t*t + t;
+        let forthBlending = t*t*t - t*t;
+
+        let v0 = {
+            x: points[1].x - points[0].x,
+            y: points[1].y - points[0].y
+        };
+
+        let v1 = {
+            x: points[2].x - points[3].x,
+            y: points[2].y - points[3].y
+        };
+
+        p.x = firstBlending * points[0].x + secondBlending * points[3].x + thirdBlending * v0.x + forthBlending * v1.x;
+        p.y = firstBlending * points[0].y + secondBlending * points[3].y + thirdBlending * v0.y + forthBlending * v1.y;
+
+
+        return p;
+    }
+
+
+    // draw canvas
+    function drawCanvas() {
+        // Clear everything
+        context1.clearRect(0, 0, canvas1.width, canvas1.height);  // Clear canvas
+
+        // Background grids
+        drawGrid(context1,canvas1.width, canvas1.height); // Draw background grid
+
+        // Curve through points and vertices
+        drawArrow(context1, style, points[0].x, points[0].y, points[1].x, points[1].y);
+        drawArrow(context1, style, points[3].x, points[3].y, points[2].x, points[2].y);
+
+        const sample = 50;
+        let hermitePlot = new Array(sample);
+
+        for (let i = 0; i < sample; ++i) hermitePlot[i] = hermite(i / (sample - 1));
+
+        let mid = hermite(0.5);
+        document.getElementById("Point").innerHTML = "Point at t = 0.5 is (" + mid.x + "," + mid.y + ")";
+        
+
+        drawCurve(context1, style, hermitePlot); // Draw curve
+        drawVertices(context1, style, points); // Draw vertices as circles
+        drawVertices(context1, style, [mid]); // Draw vertices as circles
+
+    }
+
+
+    // Draw a background grid
+    function drawGrid(myContext,bw,bh){
+        var delta = 50; // grid cell size
+
+        for (var x = 0; x <= bw; x += delta) {
+            myContext.moveTo(x, 0);
+            myContext.lineTo(x, bh);
+        }
+
+        for (var y = 0; y <= bh; y += delta) {
+            myContext.moveTo(0, y);
+            myContext.lineTo(bw , y);
+        }
+
+        myContext.lineWidth = 1;
+        myContext.strokeStyle = "lightgray";
+        myContext.stroke();
+
+        myContext.fillStyle = "black";
+        myContext.font = "12px Arial";
+        myContext.fillText("(0,0)",2,12);
+
+    }
+
+    // Draws a polygonal curve connecting the points, after applying the given transformation
+    function drawCurve(ctx, style, points, transformation) {
+        // The transformation is optional. If none provided, use identity transform
+        if (transformation===undefined) {
+            transformation = function(p){return p}; //Identity transform
+        }
+
+        // Draw curve
+        ctx.lineWidth = style.curve.width;
+        ctx.strokeStyle = style.curve.color;
+        ctx.beginPath();
+        var firstPoint = transformation(points[0]);
+        var currentPoint;
+        ctx.moveTo(firstPoint.x, firstPoint.y);
+        for (var i = 0; i < points.length; i++) {
+            currentPoint =  transformation(points[i]);
+            ctx.lineTo(currentPoint.x, currentPoint.y);
+            ctx.moveTo(currentPoint.x, currentPoint.y);
+        }
+        ctx.stroke();
+    }
+
+    // Draw circles around vertices to facilitate drag and drop
+    function drawVertices (ctx, style, points) {
+        for (var i = 0; i < points.length; i++) {
+            var p = points[i];
+            ctx.lineWidth = style.point.width;
+            ctx.strokeStyle = style.point.color;
+            ctx.fillStyle = style.point.fill;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, style.point.radius, style.point.arc1, style.point.arc2, true);
+            ctx.fill();
+            ctx.stroke();
+        }
+    }
+
+    //Thanks to Victor Franco (previous DCS student) for this function
+    function drawArrow(myContext, style, x1, y1, x2, y2){
+		let x3 = (((x2 + (y2 - y1)) + x1)/2 - x2)*0.25 + x2, y3 = (((y2 + (x1 - x2)) + y1)/2 - y2)*0.25+y2;
+		let x4 = (((x2 - (y2 - y1)) + x1)/2 - x2)*0.25 + x2, y4 = (((y2 - (x1 - x2)) + y1)/2 - y2)*0.25+y2;
+		
+		
+		myContext.lineWidth = 1;
+        myContext.strokeStyle = "#0000FF";
+        myContext.beginPath();
+		myContext.moveTo(x1, y1);
+		myContext.lineTo(x2, y2);
+		myContext.lineTo(x3, y3);
+		myContext.moveTo(x2, y2);
+		myContext.lineTo(x4, y4);
+        myContext.stroke();
+		
+	}
+
+    /**
+     Methods to allow dragging transformedPoints around
+     **/
+
+    // start dragging
+    function dragStart(e) {
+        e = mousePos(e);
+        var dx, dy;
+        for (var i=0; i<points.length;i++) {
+            dx = points[i].x - e.x;
+            dy = points[i].y - e.y;
+            if ((dx * dx) + (dy * dy) < style.point.radius * style.point.radius) {
+                drag = i;
+                draggedPoint = e;
+                canvas1.style.cursor = "move";
+                return;
+            }
+        }
+    }
+
+    // dragging
+    function dragging(e) {
+        if (drag!=null) {
+            e = mousePos(e);
+            points[drag].x += e.x - draggedPoint.x;
+            points[drag].y += e.y - draggedPoint.y;
+            draggedPoint = e;
+            drawCanvas();
+        }
+    }
+
+    // end dragging
+    function dragEnd(e) {
+        drag = null;
+        canvas1.style.cursor = "default";
+        drawCanvas();
+    }
+
+    // event parser
+    function mousePos(event) {
+        event = (event ? event : window.event);
+        return {
+            x: event.pageX - canvas1.offsetLeft,
+            y: event.pageY - canvas1.offsetTop
+        }
+    }
+
+    /**
+     * Start ("main method")
+     */
+
+    // Assign canvas and context variables
+    canvas1 = document.getElementById("canvas1");
+    context1 = canvas1.getContext("2d");
+
+    init();
+
+    /**
+     * Auxiliary functions
+     */
+
+
+</script>
+</body>
+</html>
